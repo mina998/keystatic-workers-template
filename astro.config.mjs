@@ -11,6 +11,7 @@ export default defineConfig({
     experimental: {
         incrementalBuild: true,
     },
+    session: false,
     output: 'server',
     adapter: cloudflare(),
     integrations: [react(), markdoc(), keystatic()],
