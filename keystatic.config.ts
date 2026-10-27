@@ -5,7 +5,7 @@ export default config({
     storage: {
         // kind: 'local',
         kind: 'github',
-        repo: 'mina998/6d',
+        repo: 'mina998/keystatic-workers-template',
     },
     collections: {
         // 文章
