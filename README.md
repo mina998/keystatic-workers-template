@@ -127,7 +127,7 @@ App 的 slug 是设置页地址的最后一段。`https://github.com/settings/ap
 在 App 页面复制：
 
 - Client ID
-- Client secrets 里新建的 Client Secret（只显示一次）
+- Client secrets (**Credentials**)  里新建的 Client Secret（只显示一次）
 
 `KEYSTATIC_SECRET` 自己生成，至少 32 个字符，用 64 位小写字母和数字即可。它用来加密登录 cookie，不是 GitHub 发的。
 
