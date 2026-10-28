@@ -95,7 +95,7 @@ PUBLIC_KEYSTATIC_GITHUB_APP_SLUG
 | Callback URL | `https://xxx.com/api/keystatic/github/oauth/callback` |
 
 ## 修改权限地址
-- https://github.com/settings/apps/<app-slug>/permissions
+- `https://github.com/settings/apps/<app-slug>/permissions`
 - 在 Repository permissions 中设置
 | Contents | Read and write |
 | Pull requests | Read-only |
