@@ -97,6 +97,8 @@ PUBLIC_KEYSTATIC_GITHUB_APP_SLUG
 ## 修改权限地址
 - `https://github.com/settings/apps/<app-slug>/permissions`
 - 在 Repository permissions 中设置
+| 字段 | 值 |
+| --- | --- |
 | Contents | Read and write |
 | Pull requests | Read-only |
 | Metadata | Read-only（勾选上面两项后一般会自动带上，不要取消） |
