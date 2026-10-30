@@ -1,0 +1,79 @@
+---
+title: Nginx HTTPS 证书配置指南
+date: 2026-10-04
+draft: false
+category: 运维
+tags:
+  - Nginx
+description: 使用 Let's Encrypt 与 Certbot 免费签发证书，完成自动续期与现代 TLS 安全配置。
+---
+
+## 为什么全站 HTTPS
+
+没有加密的流量在链路上裸奔，账号密码可被中间人截获；浏览器对 HTTP 站点标注「不安全」，SEO 也会降权。如今 HTTPS 已是底线而非加分项。
+
+## 用 Certbot 签发免费证书
+
+```bash
+# Debian/Ubuntu
+apt install certbot python3-certbot-nginx
+
+# 一条命令完成验证 + 配置
+certbot --nginx -d example.com -d www.example.com
+```
+
+Certbot 会自动修改 Nginx 配置，添加 443 监听与证书路径，并把 80 重定向到 HTTPS。
+
+## 生成的配置长什么样
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    # 安全参数
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+
+    add_header Strict-Transport-Security "max-age=63072000" always;
+}
+
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+## 自动续期
+
+Let's Encrypt 证书有效期 90 天，Certbot 装好后自带 systemd 定时器：
+
+```bash
+certbot renew --dry-run     # 验证续期流程
+systemctl list-timers | grep certbot
+```
+
+续期后需要 reload Nginx 让新证书生效，可以加个 hook：
+
+```bash
+echo 'docker exec nginx nginx -s reload' \
+  > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+```
+
+## 常见问题
+
+- **验证失败**：确认 80 端口可从公网访问，DNS 已生效
+- **混合内容警告**：页面里的 http:// 资源要全部改成 https:// 或协议相对地址
+- **Docker 场景**：webroot 模式配合挂载验证目录，或用 DNS 验证
+- **泛域名证书**：Let's Encrypt 需 DNS 验证，用 `certbot-dns-cloudflare` 插件
+
+## 小结
+
+免费证书加自动续期，HTTPS 的成本几乎只剩初始配置的十分钟。配置完用 SSL Labs 的测试跑个分，A+ 不再是奢侈品。

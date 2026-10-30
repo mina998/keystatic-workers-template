@@ -1,0 +1,57 @@
+---
+title: 浏览器关键渲染路径详解
+date: 2026-02-18
+draft: false
+category: 前端
+tags:
+  - JavaScript
+description: 解析从 HTML 到像素的完整流程，理解重排与重绘的区别，掌握减少渲染开销的实用技巧。
+---
+
+## 页面是如何被画出来的
+
+浏览器把资源变成像素，要经历五个阶段：
+
+1. **解析 HTML** 生成 DOM 树
+2. **解析 CSS** 生成 CSSOM 树
+3. **合并**两者生成渲染树（Render Tree）
+4. **布局（Layout / Reflow）** 计算每个节点的几何信息
+5. **绘制（Paint）与合成（Composite）** 把内容画到屏幕
+
+这条链路就是「关键渲染路径」。
+
+## 重排与重绘
+
+- **重排**：几何信息变化，需要重新执行布局，开销大
+- **重绘**：外观变化但不影响布局，如颜色、背景
+- **合成**：只移动已绘制好的图层，开销最小
+
+典型触发重排的操作：
+
+- 修改 width、height、top、left 等几何属性
+- 增删 DOM 节点、改变窗口大小
+- 读取 offsetWidth、getBoundingClientRect 等强制同步布局
+
+## 强制同步布局的陷阱
+
+```js
+// 反例：读写交替，每次循环都触发重排
+for (let i = 0; i < items.length; i++) {
+  items[i].style.width = box.offsetWidth + 10 + 'px';
+}
+
+// 正例：先集中读取，再集中写入
+const width = box.offsetWidth + 10;
+items.forEach(el => { el.style.width = width + 'px'; });
+```
+
+## 减少渲染开销的技巧
+
+- 动画优先使用 `transform` 与 `opacity`，让浏览器走合成路径
+- 需要频繁改动的元素提升为独立图层，但注意内存消耗
+- 用 `content-visibility: auto` 跳过屏幕外内容的渲染
+- 批量 DOM 操作用 `DocumentFragment` 或先 `display: none` 脱离文档流
+
+## 小结
+
+「少重排、走合成」是渲染优化的总原则。开发中用 Performance 面板录制一段动画，若看到大量紫色 Layout 条块，就该按上面的清单排查了。

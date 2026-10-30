@@ -1,0 +1,80 @@
+---
+title: MySQL 索引优化实践
+date: 2026-09-16
+draft: false
+category: 运维
+tags:
+  - MySQL
+description: 讲解 B+ 树索引结构与最左前缀原则，用 EXPLAIN 分析慢查询，避开常见索引失效场景。
+---
+
+## 索引为什么快
+
+InnoDB 的索引是 B+ 树，把全表扫描的 O(n) 变成树查找的 O(log n)。代价是写入时需要维护树结构，因此索引不是越多越好。
+
+## 最左前缀原则
+
+联合索引 `(a, b, c)` 相当于建了 `(a)`、`(a,b)`、`(a,b,c)` 三个索引：
+
+```sql
+-- 能走索引
+WHERE a = 1
+WHERE a = 1 AND b = 2
+WHERE a = 1 AND b > 2 AND c = 3   -- c 用不上索引排序，但 a b 可用
+
+-- 用不上（缺少最左列 a）
+WHERE b = 2
+WHERE b = 2 AND c = 3
+```
+
+设计原则：**区分度高的列放前面，范围查询的列放最后**。
+
+## 用 EXPLAIN 诊断
+
+```sql
+EXPLAIN SELECT * FROM orders
+WHERE user_id = 42 ORDER BY created_at DESC LIMIT 10;
+```
+
+重点看三列：
+
+- **type**：`ref` 良好，`range` 可接受，`ALL` 全表扫描要警惕
+- **key**：实际使用的索引，NULL 说明没走
+- **rows**：预估扫描行数，越少越好
+
+## 常见失效场景
+
+```sql
+-- 对索引列做函数或运算
+WHERE YEAR(created_at) = 2026        -- 失效
+WHERE created_at >= '2026-01-01'     -- 正确写法
+
+-- 隐式类型转换
+WHERE phone = 13800138000            -- phone 是 varchar 时失效
+
+-- 前导模糊
+WHERE name LIKE '%明'                -- 失效
+WHERE name LIKE '小明%'              -- 可用
+
+-- OR 两侧有一侧无索引
+WHERE user_id = 1 OR age = 20        -- age 无索引则整体全表扫
+```
+
+## 覆盖索引减少回表
+
+```sql
+-- 如果索引是 (user_id, created_at, status)
+SELECT status FROM orders WHERE user_id = 42;
+-- Extra 显示 Using index，无需回表，性能最佳
+```
+
+## 实践建议
+
+1. 慢查询日志（`slow_query_log`）定位问题 SQL
+2. 区分度太低的列（如性别）不单独建索引
+3. 前缀索引节省空间：`INDEX(name(20))`
+4. 删除冗余索引，`(a,b)` 存在时 `(a)` 就是冗余
+
+## 小结
+
+索引优化的路径固定：**慢日志找 SQL → EXPLAIN 看计划 → 按查询模式设计联合索引**。让查询语句和索引设计互相成全，而不是各写各的。

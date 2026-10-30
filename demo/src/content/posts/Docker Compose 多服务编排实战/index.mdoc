@@ -1,0 +1,100 @@
+---
+title: Docker Compose 多服务编排实战
+date: 2026-09-28
+draft: false
+category: 运维
+tags:
+  - Docker
+description: 用一个博客系统的完整例子讲解 Compose 文件结构、服务依赖、网络与数据卷的配置方法。
+---
+
+## Compose 解决什么问题
+
+一条 `docker run` 起一个容器，但真实应用至少要 Web、数据库、缓存三个。Compose 用一个 YAML 描述整套服务，`docker compose up -d` 一键拉起。
+
+## 完整示例：博客系统
+
+```yaml
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://blog:secret@db:5432/blog
+      REDIS_URL: redis://cache:6379
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: blog
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: blog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog"]
+      interval: 5s
+      retries: 5
+
+  cache:
+    image: redis:7
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+```
+
+## 关键点解析
+
+### 服务名即主机名
+
+同一 Compose 项目自动组成独立网络，`db`、`cache` 直接作为连接地址，不需要 IP。
+
+### depends_on 与 healthcheck
+
+只写 `depends_on: [db]` 仅保证启动顺序，不保证数据库就绪。加上 `condition: service_healthy` 与健康检查，Web 才会在数据库真正可用后启动。
+
+### 数据卷
+
+命名卷 `pgdata` 让容器删了数据还在。**开发环境代码热更新**则用绑定挂载：
+
+```yaml
+  web:
+    build: .
+    volumes:
+      - ./src:/app/src
+```
+
+## 常用命令
+
+```bash
+docker compose up -d            # 后台启动全部
+docker compose logs -f web      # 跟踪某个服务日志
+docker compose ps               # 查看状态
+docker compose exec web sh      # 进入容器
+docker compose up -d --build    # 改代码后重建
+docker compose down             # 停止并删除（数据卷保留）
+docker compose down -v          # 连数据一起清空（慎用）
+```
+
+## 环境变量管理
+
+敏感信息放 `.env` 文件（记得加进 `.gitignore`）：
+
+```env
+POSTGRES_PASSWORD=secret
+```
+
+YAML 中用 `${POSTGRES_PASSWORD}` 引用，仓库里不再出现明文密码。
+
+## 小结
+
+单机部署的最优解就是 Compose：一份 YAML 进版本库，任何人 `docker compose up` 就能复现完整环境。「在我机器上能跑」从此失去借口。

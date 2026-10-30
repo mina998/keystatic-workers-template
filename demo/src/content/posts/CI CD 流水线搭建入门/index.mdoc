@@ -1,0 +1,97 @@
+---
+title: CI CD 流水线搭建入门
+date: 2026-10-22
+draft: false
+category: 运维
+tags:
+  - DevOps
+  - Docker
+description: 以 GitHub Actions 为例，从测试、构建到部署搭建一条最小可用流水线，并介绍缓存与密钥管理。
+---
+
+## CI 与 CD 分别是什么
+
+- **CI（持续集成）**：每次 push 自动跑测试与构建，尽早暴露问题
+- **CD（持续部署 / 交付）**：通过后自动发布到服务器或镜像仓库
+
+流水线的价值在于把「人肉发布的紧张两小时」变成「不看结果的三十秒」。
+
+## 最小可用示例
+
+```yaml
+# .github/workflows/deploy.yml
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm            # 缓存依赖，提速明显
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: 构建并推送镜像
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: deploy
+          key: ${{ secrets.SERVER_KEY }}
+          script: |
+            cd /srv/app
+            docker compose pull
+            docker compose up -d --remove-orphans
+```
+
+## 设计要点
+
+### 阶段划分
+
+`lint → test → build → deploy` 依次卡关，测试不过绝不构建，构建失败绝不部署。小项目可以合并，但顺序不能乱。
+
+### 缓存
+
+依赖安装往往占流水线一半时间。`setup-node` 的 `cache: npm`、Docker 的 `cache-from` 都值得配置。
+
+### 密钥管理
+
+- 一切凭据放仓库的 **Secrets**，YAML 中只有引用没有明文
+- 服务器侧用最小权限账号，只授权 `docker compose` 相关操作
+- 定期轮换部署密钥
+
+### 部署策略
+
+- 简单场景：`docker compose pull && up -d` 足够
+- 需要零停机：滚动更新或蓝绿部署
+- 每次发布打不可变 tag（如 git sha），回滚 = 换 tag 重跑
+
+## 常见坑
+
+- workflow 改了却触发旧版本：确认分支与路径过滤条件
+- `npm ci` 报 lock 不一致：提交 lockfile，别用 `npm install`
+- 服务器部署失败但 CI 绿了：把部署脚本输出加 `set -e` 与回显
+
+## 小结
+
+从这条 30 行的 YAML 开始，先让「push 即发布」跑起来，再逐步补充测试覆盖率、部署通知与回滚脚本。自动化的信心是攒出来的，不是一步到位设计出来的。

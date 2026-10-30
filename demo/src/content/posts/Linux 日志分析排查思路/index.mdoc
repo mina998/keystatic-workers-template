@@ -1,0 +1,86 @@
+---
+title: Linux 日志分析排查思路
+date: 2026-10-10
+draft: false
+category: 运维
+tags:
+  - Linux
+description: 介绍 journalctl 与常见日志文件的位置，配合 grep、awk 等工具建立系统化的故障排查流程。
+---
+
+## 日志都在哪
+
+| 日志 | 位置 | 内容 |
+| --- | --- | --- |
+| 系统与内核 | `journalctl` | systemd 管理的全部 |
+| 认证记录 | `/var/log/auth.log` 或 `secure` | 登录成功失败 |
+| Nginx | `/var/log/nginx/` | access + error |
+| 应用 | 各自配置目录 | 业务输出 |
+
+## journalctl 的正确打开方式
+
+```bash
+journalctl -u nginx -f              # 跟踪某服务的实时日志
+journalctl -u app --since "1 hour ago"
+journalctl -p err -b                # 本次启动以来的错误级别日志
+journalctl --disk-usage             # 日志占用
+journalctl --vacuum-time=7d         # 只保留七天
+```
+
+## 文本三剑客
+
+### grep：快速定位
+
+```bash
+grep -c "Failed password" /var/log/auth.log   # 统计爆破次数
+grep -i "error" app.log | grep -v "DEBUG"
+zgrep "500 " access.log.gz                    # 直接查压缩包
+```
+
+### awk：结构化提取
+
+```bash
+# 统计访问量 Top 10 的 IP
+awk '{print $1}' access.log | sort | uniq -c | sort -rn | head
+
+# 提取 5xx 状态码的请求路径
+awk '$9 ~ /^5/ {print $9, $7}' access.log
+```
+
+### sort + uniq：聚合分析
+
+```bash
+# 每分钟错误数量趋势
+grep "ERROR" app.log | cut -c1-16 | sort | uniq -c
+```
+
+## 实战排查模板
+
+**场景：网站突然 502**
+
+```bash
+# 1. 错误什么时候开始的？
+awk '$9 == 502 {print $4}' access.log | head
+
+# 2. Nginx 眼里发生了什么？
+tail -100 /var/log/nginx/error.log
+
+# 3. 后端进程还活着吗？
+systemctl status myapp
+journalctl -u myapp --since "30 min ago" | tail -50
+
+# 4. 资源耗尽了吗？
+free -h; df -h; dmesg -T | grep -i kill   # OOM 会在这里
+```
+
+按「入口 → 代理 → 应用 → 系统」逐层下钻，避免上来就重启掩盖真因。
+
+## 长期治理
+
+- 日志轮转：logrotate 确认配置，避免磁盘被日志撑爆
+- 集中收集：小团队 Loki + Grafana 就够用
+- 结构化输出：应用打 JSON 日志，省去解析痛苦
+
+## 小结
+
+排障能力的差距不在会多少命令，而在有没有固定的下钻路径。把上面这套模板练熟，多数故障都能在十分钟内锁定层面。

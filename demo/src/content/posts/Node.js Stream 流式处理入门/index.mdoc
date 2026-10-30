@@ -1,0 +1,86 @@
+---
+title: Node.js Stream 流式处理入门
+date: 2026-07-18
+draft: false
+category: 编程
+tags:
+  - Nodejs
+description: 理解可读流、可写流与管道的概念，学会用流处理大文件，避免内存爆仓。
+---
+
+## 为什么要用流
+
+把一个 2GB 的文件读进内存再写出去，内存曲线会画出一条惊心动魄的山峰。流把数据切成小块，边读边处理边写，内存占用恒定：
+
+```js
+// 反例：一次性读写
+const data = fs.readFileSync('big.zip');
+fs.writeFileSync('copy.zip', data);
+
+// 正例：流式复制
+fs.createReadStream('big.zip')
+  .pipe(fs.createWriteStream('copy.zip'));
+```
+
+## 四种流
+
+- **Readable**：数据来源，如 `fs.createReadStream`、HTTP 请求
+- **Writable**：数据去向，如 `fs.createWriteStream`、HTTP 响应
+- **Duplex**：可读可写，如 TCP socket
+- **Transform**：读写之间做转换，如压缩、加密
+
+## 背压（Backpressure）
+
+写入速度跟不上读取速度时，`pipe` 内部会自动暂停读取、等待写入完成再恢复，这就是背压机制。手写循环时要用 `write()` 的返回值处理：
+
+```js
+async function processFile(src, dest) {
+  const rs = fs.createReadStream(src);
+  const ws = fs.createWriteStream(dest);
+
+  for await (const chunk of rs) {
+    if (!ws.write(chunk)) {
+      await once(ws, 'drain');
+    }
+  }
+  ws.end();
+}
+```
+
+## 转换流实战
+
+```js
+const { Transform } = require('node:stream');
+const zlib = require('node:zlib');
+
+const upper = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();
+  },
+});
+
+// 逐块大写 + gzip 压缩
+process.stdin
+  .pipe(upper)
+  .pipe(zlib.createGzip())
+  .pipe(fs.createWriteStream('out.gz'));
+```
+
+## 错误处理
+
+`pipe` 不会自动传播错误，必须给每个流挂监听，或使用 `pipeline`：
+
+```js
+const { pipeline } = require('node:stream/promises');
+
+await pipeline(
+  fs.createReadStream('in.log'),
+  zlib.createGzip(),
+  fs.createWriteStream('out.gz')
+); // 任一环节出错都会 reject
+```
+
+## 小结
+
+凡是「数据大于内存」或「边产生边消费」的场景，流都是标准答案。记住：读流用 for await，串流用 pipeline，别再裸 pipe 了。

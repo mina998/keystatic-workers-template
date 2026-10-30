@@ -1,0 +1,60 @@
+---
+title: 深入理解 JavaScript 事件循环
+date: 2026-01-25
+draft: false
+category: 前端
+tags:
+  - JavaScript
+description: 用通俗的例子讲解调用栈、宏任务与微任务的执行顺序，彻底搞懂 setTimeout 与 Promise 的输出差异。
+---
+
+## 从一道经典面试题开始
+
+```js
+console.log('1');
+setTimeout(() => console.log('2'), 0);
+Promise.resolve().then(() => console.log('3'));
+console.log('4');
+```
+
+输出顺序是 `1 4 3 2`。要解释这个结果，需要理解 JavaScript 的单线程执行模型。
+
+## 调用栈与消息队列
+
+JavaScript 只有一个调用栈，函数调用时入栈，返回时出栈。同步代码全部执行完毕后，引擎才会去队列里取任务。队列分为两种：
+
+- **微任务队列**：Promise 回调、queueMicrotask、MutationObserver
+- **宏任务队列**：setTimeout、setInterval、I/O、UI 事件
+
+## 执行顺序规则
+
+1. 执行当前同步代码（清空调用栈）
+2. 清空整个微任务队列
+3. 取出一个宏任务执行
+4. 再次清空微任务队列，如此往复
+
+也就是说，**每完成一个宏任务，微任务队列都会被彻底清空一次**。
+
+## 定时器的真相
+
+`setTimeout(fn, 0)` 并不代表「立即执行」，而是「至少延迟 0 毫秒后把回调放入宏任务队列」。真正的执行时机取决于前面还有多少任务排队。
+
+## 实践意义
+
+- 避免在微任务中递归创建微任务，否则页面会失去响应
+- 长时间计算应拆分为多个宏任务，或使用 Web Worker
+- 理解 async/await：`await` 之后的代码相当于 `.then` 回调，属于微任务
+
+```js
+async function demo() {
+  console.log('a');
+  await Promise.resolve();
+  console.log('b'); // 微任务中执行
+}
+demo();
+console.log('c'); // 输出 a c b
+```
+
+## 小结
+
+事件循环的核心口诀是「同步先行、微任务优先、宏任务垫后」。掌握这套顺序，绝大多数异步输出题都能在脑中推演出来。

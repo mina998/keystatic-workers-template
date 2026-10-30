@@ -1,0 +1,18 @@
+---
+title: 系统禁止运行.ps1 脚本解决方案
+date: 2026-10-29
+draft: false
+category: 电脑
+tags:
+  - Windows
+---
+
+```
+# 管理员身份运行 PowerShell  
+
+#
+set-ExecutionPolicy RemoteSigned  
+
+#
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser 
+```

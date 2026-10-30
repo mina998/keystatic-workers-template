@@ -1,0 +1,69 @@
+---
+title: CSS Grid 布局从入门到实践
+date: 2026-01-01
+draft: false
+category: 前端
+tags:
+  - CSS
+description: 介绍 CSS Grid 二维布局的核心概念与常用语法，并通过经典页面结构示例演示实际用法。
+---
+
+## 什么是 CSS Grid
+
+CSS Grid 是浏览器原生支持的二维布局系统，可以同时控制行与列，非常适合搭建页面整体骨架。相比传统的浮动与定位方案，Grid 的代码更直观，容器与子项的职责也更加清晰。
+
+## 核心概念
+
+Grid 布局围绕三个基本概念展开：
+
+- **容器（container）**：声明 `display: grid` 的元素
+- **轨道（track）**：行与列占据的空间
+- **单元格与区域（cell / area）**：轨道交叉形成的基本单位
+
+## 基础用法
+
+```css
+.page {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 60px 1fr 40px;
+  grid-template-areas:
+    "header header"
+    "sidebar main"
+    "footer footer";
+  min-height: 100vh;
+}
+
+.header  { grid-area: header; }
+.sidebar { grid-area: sidebar; }
+.main    { grid-area: main; }
+.footer  { grid-area: footer; }
+```
+
+`fr` 单位表示剩余空间的份数，非常适合实现自适应两栏布局。
+
+## 常用函数
+
+- `repeat(12, 1fr)`：快速生成十二列栅格
+- `minmax(200px, 1fr)`：限制轨道的最小与最大宽度
+- `auto-fill` 与 `auto-fit`：配合 `repeat` 实现响应式卡片列表
+
+```css
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+```
+
+上面这段代码不需要任何媒体查询，就能让卡片随容器宽度自动换行。
+
+## 间距与对齐
+
+- `gap`：设置轨道间距，代替传统的 margin 技巧
+- `justify-items` / `align-items`：控制子项在单元格内的对齐
+- `place-content`：控制整个网格在容器中的分布
+
+## 小结
+
+Grid 擅长处理整体布局，Flexbox 擅长处理单行或单列的内容排列，两者配合使用可以覆盖绝大多数布局场景。建议从 `grid-template-areas` 入手，先把页面骨架搭好，再逐步学习子项跨行跨列等进阶特性。

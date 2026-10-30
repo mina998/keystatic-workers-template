@@ -1,0 +1,68 @@
+---
+title: React Hooks 常见误区与最佳实践
+date: 2026-01-13
+draft: false
+category: 前端
+tags:
+  - React
+description: 整理日常开发中使用 useState、useEffect 时容易踩坑的场景，并给出更稳妥的写法建议。
+---
+
+## 误区一：把 useEffect 当成生命周期的替代品
+
+很多人从类组件迁移过来后，习惯把 `useEffect` 当作 `componentDidMount` 使用，实际上它的语义是「同步副作用与状态」。如果某个值可以由已有状态计算得出，就不应该放进 effect：
+
+```jsx
+// 反例：多余的 state 与 effect
+const [total, setTotal] = useState(0);
+useEffect(() => {
+  setTotal(price * count);
+}, [price, count]);
+
+// 正例：渲染期间直接派生
+const total = price * count;
+```
+
+## 误区二：依赖数组遗漏
+
+```jsx
+useEffect(() => {
+  const id = setInterval(() => {
+    setCount(c => c + step); // step 必须出现在依赖里
+  }, 1000);
+  return () => clearInterval(id);
+}, [step]);
+```
+
+遗漏依赖会导致闭包捕获过期值；如果依赖频繁变化导致重复执行，应该考虑用函数式更新或 `useRef` 存放可变值。
+
+## 误区三：在 Hook 里做条件调用
+
+Hook 必须保证每次渲染的调用顺序一致，因此不能出现在 `if`、循环或嵌套函数中：
+
+```jsx
+// 反例
+if (loggedIn) {
+  const [data] = useState(null); // 报错
+}
+```
+
+需要条件逻辑时，拆出子组件，或把条件写在 Hook 内部。
+
+## 自定义 Hook 提升复用
+
+```js
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
+```
+
+## 小结
+
+牢记三条原则：派生数据不进 state、依赖数组如实填写、Hook 调用保持顶层。写代码前先问一句「这段逻辑是渲染需要还是副作用」，大部分坑都能提前避开。

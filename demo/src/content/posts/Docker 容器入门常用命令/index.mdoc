@@ -1,0 +1,81 @@
+---
+title: Docker 容器入门常用命令
+date: 2026-08-29
+draft: false
+category: 运维
+tags:
+  - Docker
+description: 按镜像、容器、数据、网络四类整理日常高频 Docker 命令，配合实战示例快速上手。
+---
+
+## 核心概念速记
+
+**镜像**是只读模板，**容器**是镜像的运行实例，**数据卷**负责持久化，**网络**负责互联。类比面向对象：镜像是类，容器是对象。
+
+## 镜像操作
+
+```bash
+docker pull nginx:1.27            # 拉取指定版本
+docker images                     # 列出本地镜像
+docker rmi nginx:1.27             # 删除镜像
+docker build -t myapp:1.0 .       # 从 Dockerfile 构建
+docker save -o app.tar myapp:1.0  # 导出
+docker load -i app.tar            # 导入
+```
+
+## 容器操作
+
+```bash
+docker run -d --name web -p 8080:80 nginx:1.27
+#      后台   命名       端口映射 宿主机:容器
+
+docker ps                        # 运行中的容器
+docker ps -a                     # 包含已停止的
+docker logs -f --tail 100 web    # 滚动查看日志
+docker exec -it web bash         # 进入容器
+docker stop web && docker rm web # 停止并删除
+docker stats                     # 实时资源占用
+```
+
+## 数据持久化
+
+```bash
+# 数据卷（推荐，由 Docker 管理）
+docker volume create appdata
+docker run -v appdata:/var/lib/mysql mysql:8
+
+# 绑定挂载（开发环境代码热更新）
+docker run -v $(pwd)/src:/app/src myapp
+```
+
+## 网络互联
+
+```bash
+docker network create mynet
+docker run -d --network mynet --name db mysql:8
+# 同网络内的容器直接用名字访问：db:3306
+```
+
+## 清理三板斧
+
+```bash
+docker system df                        # 看磁盘占用
+docker container prune                  # 清理停止的容器
+docker system prune -a --volumes        # 深度清理（慎用）
+```
+
+## 实战：一条命令跑起开发数据库
+
+```bash
+docker run -d --name dev-mysql \
+  -e MYSQL_ROOT_PASSWORD=secret \
+  -e MYSQL_DATABASE=app \
+  -p 3306:3306 \
+  -v dev-mysql-data:/var/lib/mysql \
+  --restart unless-stopped \
+  mysql:8
+```
+
+## 小结
+
+日常运维记住四组命令：`ps / logs / exec` 看状态，`run -d -p -v` 起服务，`network` 通互联，`prune` 清垃圾。剩下的交给 `--help`。

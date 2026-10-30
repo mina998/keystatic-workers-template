@@ -1,0 +1,76 @@
+---
+title: Node.js 版本管理与环境切换
+date: 2026-08-11
+draft: false
+category: 编程
+tags:
+  - Nodejs
+description: 介绍 nvm、fnm、Volta 三种版本管理工具的用法与差异，以及多项目并存的最佳实践。
+---
+
+## 为什么需要版本管理
+
+项目 A 依赖 Node 18，项目 B 跑在 Node 22，全局只能装一个版本。版本管理器让你在不同项目间无缝切换，还能快速验证「这个 bug 是不是版本引起的」。
+
+## 三种主流工具
+
+### nvm（最普及）
+
+```bash
+nvm install 22            # 安装指定版本
+nvm use 22                # 当前终端切换
+nvm use 20.11.1           # 精确切换
+nvm ls                    # 查看已安装版本
+nvm alias default 22      # 设置默认版本
+```
+
+Windows 用户需改用 nvm-windows，命令基本一致。
+
+### fnm（更快）
+
+Rust 编写，启动速度快一个数量级，支持 `.node-version` 与 `.nvmrc` 自动切换：
+
+```bash
+fnm install 22
+fnm use --install-if-missing
+```
+
+### Volta（工程化）
+
+按项目锁定工具链版本，进入目录自动生效：
+
+```bash
+volta install node@22
+volta pin node@20.11.1    # 写入 package.json
+```
+
+团队成员装 Volta 后执行 `npm install` 即可获得一致环境。
+
+## 按项目自动切换
+
+在项目根放一个 `.nvmrc`：
+
+```
+22
+```
+
+```bash
+nvm use          # 无参数时自动读取 .nvmrc
+```
+
+配合 shell 钩子（zsh-better-nvm-plugin、fnm env）可实现 cd 即切换。
+
+## 版本选择建议
+
+- **偶数版本（18、20、22、24）是 LTS**，生产环境只用 LTS
+- 新项目直接上最新 LTS，除非依赖不兼容
+- `.nvmrc` 提交进仓库，让「Node 版本」也成为代码的一部分
+
+## 常见问题
+
+- 切换版本后全局包不见了：nvm 每个版本的全局包相互独立，跨版本工具建议用 `npm i -g` 重装或改用项目级依赖
+- nvm 在 Windows 终端报错：确认管理员权限与符号链接设置
+
+## 小结
+
+选型一句话：个人开发 nvm 够用、追求速度 fnm、团队统一 Volta。无论哪种，先把手头项目的 `.nvmrc` 建起来。

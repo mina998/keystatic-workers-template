@@ -1,0 +1,89 @@
+---
+title: Kubernetes 核心概念速览
+date: 2026-09-22
+draft: false
+category: 运维
+tags:
+  - Kubernetes
+  - Docker
+description: 用一张架构图串联 Pod、Deployment、Service 与 Ingress，并给出本地学习环境的搭建方法。
+---
+
+## 为什么需要 K8s
+
+Docker 解决了「单机怎么跑」，Kubernetes 解决「几十台机器上几百个容器怎么管」：调度、扩缩容、自愈、滚动发布、服务发现，一揽子包办。
+
+## 核心对象一览
+
+```
+用户请求 → Ingress → Service → Pod（由 Deployment 管理）
+                              ↓
+                           挂载 Volume，读取 ConfigMap / Secret
+```
+
+- **Pod**：最小调度单元，包含一个或多个容器
+- **Deployment**：声明「我要 N 个 Pod 副本」，负责滚动更新与回滚
+- **Service**：一组 Pod 的稳定访问入口（Pod 会死会重建，IP 不固定）
+- **Ingress**：七层入口，把域名和路径路由到不同 Service
+- **ConfigMap / Secret**：配置与敏感信息和镜像分离
+
+## 一个最小的部署清单
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: myapp:1.0
+          ports:
+            - containerPort: 3000
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector: { app: web }
+  ports:
+    - port: 80
+      targetPort: 3000
+```
+
+`requests` 决定调度位置，`limits` 限制资源上限，两个都写是基本礼貌。
+
+## 常用命令
+
+```bash
+kubectl get pods -o wide          # 查看 Pod 及所在节点
+kubectl describe pod web-xxx      # 排查启动失败
+kubectl logs -f web-xxx           # 看日志
+kubectl rollout undo deploy/web   # 回滚上一版本
+kubectl port-forward svc/web 8080:80   # 本地调试
+```
+
+## 本地学习环境
+
+```bash
+# 单机学习最快的方式
+minikube start
+# 或更轻量的 k3s / kind
+```
+
+建议先用 minikube 把上面那份 YAML 跑通，再谈生产集群。
+
+## 小结
+
+理解 K8s 的关键是抓住「声明式」：你描述期望状态，控制器负责逼近它。从 Pod 到 Deployment 再到 Service，按请求流向串起来学，比背 API 手册快得多。

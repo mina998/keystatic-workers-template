@@ -1,0 +1,87 @@
+---
+title: WordPress 插件开发入门
+date: 2026-08-17
+draft: false
+category: 编程
+tags:
+  - Wordpress
+description: 从一个最小可用插件开始，讲解钩子、短代码与选项存储，带你迈出插件开发第一步。
+---
+
+## 最小可用插件
+
+在 `wp-content/plugins/` 下建一个 PHP 文件，加上标准头即可被识别：
+
+```php
+<?php
+/**
+ * Plugin Name: 我的第一插件
+ * Description: 在文章末尾追加一段版权声明
+ * Version: 1.0.0
+ */
+
+if (!defined('ABSPATH')) {
+    exit; // 阻止直接访问
+}
+```
+
+在后台「插件」页就能看到并启用它了。
+
+## 钩子：WordPress 的神经系统
+
+插件的一切能力都建立在钩子上：
+
+```php
+// filter：过滤并返回内容
+add_filter('the_content', function ($content) {
+    if (is_single()) {
+        $content .= '<p>© 2026 我的博客</p>';
+    }
+    return $content;
+});
+
+// action：在某个时机做事
+add_action('wp_head', function () {
+    echo '<meta name="my-plugin" content="active">';
+});
+```
+
+- **Filter** 挂在数据流上，接收值、修改并返回
+- **Action** 挂在事件点上，只执行不返回
+
+## 短代码
+
+```php
+add_shortcode('box', function ($atts, $content = '') {
+    $atts = shortcode_atts(['color' => 'blue'], $atts);
+    return "<div class='box box-{$atts['color']}'>{$content}</div>';
+});
+```
+
+编辑器里写 `[box color="red"]重要提示[/box]` 即可渲染出自定义块。
+
+## 存储配置
+
+```php
+// 注册设置项（开启选项持久化白名单）
+add_action('admin_init', function () {
+    register_setting('my_plugin', 'my_plugin_title');
+});
+
+// 读取
+$title = get_option('my_plugin_title', '默认标题');
+```
+
+配合 `add_menu_page` 可以搭建自己的设置后台。
+
+## 安全清单
+
+- 所有输入用 sanitize 校验：`sanitize_text_field`、`absint`
+- 所有输出用 escape：`esc_html`、`esc_attr`、`esc_url`
+- SQL 永远走 `$wpdb->prepare`
+- 校验 nonce 防止 CSRF：`wp_verify_nonce`
+- 用户能力检查：`current_user_can`
+
+## 小结
+
+WordPress 插件开发的精髓是「站在钩子上思考」：想做什么是你的事，什么时候做交给钩子。从一个 filter 开始，你会发现整个 WP 都变得可编程了。

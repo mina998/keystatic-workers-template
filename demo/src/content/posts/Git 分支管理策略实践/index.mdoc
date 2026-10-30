@@ -1,0 +1,68 @@
+---
+title: Git 分支管理策略实践
+date: 2026-07-06
+draft: false
+category: 编程
+tags:
+  - Git
+description: 对比 Git Flow 与 GitHub Flow 两种主流分支模型，给出小团队从混乱到秩序的落地建议。
+---
+
+## 为什么需要分支策略
+
+没有约定的团队里，master 直接改、hotfix 满天飞、合并冲突成日常。分支策略的本质是回答三个问题：在哪里开发、在哪里发布、如何处理紧急修复。
+
+## GitHub Flow：简单优先
+
+```
+main ──●──●──●──●──
+        \   \/   \
+         ●──●     ●  (feature/fix 分支 + PR)
+```
+
+规则只有五条：
+
+1. `main` 始终可部署
+2. 所有新工作从 `main` 拉出描述性命名的分支
+3. 通过 Pull Request 发起合并与代码评审
+4. CI 通过且评审通过后合并
+5. 合并后立即部署
+
+**适合**：持续部署的 Web 产品、小团队、发布频率高。
+
+## Git Flow：结构优先
+
+```
+main    ──●─────────●────    (仅存发布版本)
+             \       /
+release      ●──●──●
+develop  ──●──●──●──●──●──
+           \   /
+feature     ●──●
+hotfix  ───────●──→ 合回 main 和 develop
+```
+
+围绕 `main`（生产）、`develop`（集成）、`feature`、`release`、`hotfix` 五类分支运转，流程完整但开销大。
+
+**适合**：版本化发布的产品、App 端、多人协作的固定周期迭代。
+
+## 实践建议
+
+- **小团队直接用 GitHub Flow**，等流程痛点真实出现再演进
+- 分支命名统一：`feat/xxx`、`fix/xxx`、`chore/xxx`
+- 合并前 rebase 到最新 main，保持线性历史（或团队统一用 squash merge）
+- PR 控制在 400 行以内，评审效率最高
+- 保护分支：`main` 禁止直接 push
+
+## 常用命令备忘
+
+```bash
+git switch -c feat/login        # 新建并切换
+git rebase main                 # 变基到 main
+git cherry-pick <commit>        # 摘樱桃到当前分支
+git branch --merged             # 查看已合并分支，方便清理
+```
+
+## 小结
+
+分支策略没有银弹，与团队规模和发布节奏匹配最重要。宁可简单到略显无聊，也不要复杂到没人遵守。

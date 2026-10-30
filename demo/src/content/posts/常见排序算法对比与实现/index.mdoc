@@ -1,0 +1,80 @@
+---
+title: 常见排序算法对比与实现
+date: 2026-07-12
+draft: false
+category: 编程
+tags:
+  - Algorithm
+  - Python
+description: 用 Python 实现冒泡、快排、归并等经典排序，并从时间复杂度与稳定性角度横向对比。
+---
+
+## 一张表看懂
+
+| 算法 | 平均 | 最坏 | 空间 | 稳定 |
+| --- | --- | --- | --- | --- |
+| 冒泡排序 | O(n²) | O(n²) | O(1) | 稳定 |
+| 选择排序 | O(n²) | O(n²) | O(1) | 不稳定 |
+| 插入排序 | O(n²) | O(n²) | O(1) | 稳定 |
+| 快速排序 | O(n log n) | O(n²) | O(log n) | 不稳定 |
+| 归并排序 | O(n log n) | O(n log n) | O(n) | 稳定 |
+| 堆排序 | O(n log n) | O(n log n) | O(1) | 不稳定 |
+
+## 插入排序：小数据王者
+
+```python
+def insertion_sort(arr):
+    for i in range(1, len(arr)):
+        key = arr[i]
+        j = i - 1
+        while j >= 0 and arr[j] > key:
+            arr[j + 1] = arr[j]
+            j -= 1
+        arr[j + 1] = key
+    return arr
+```
+
+像整理扑克牌，n 小于 50 时它甚至比快排快，因此常被用作快排的递归终止分支。
+
+## 快速排序：分治的极致
+
+```python
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    mid = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + mid + quick_sort(right)
+```
+
+核心是选基准 + 分区。生产实现通常用三数取中防退化，并在小区间切换插入排序。
+
+## 归并排序：稳定的 O(n log n)
+
+```python
+def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    mid = len(arr) // 2
+    left, right = merge_sort(arr[:mid]), merge_sort(arr[mid:])
+    result, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i]); i += 1
+        else:
+            result.append(right[j]); j += 1
+    return result + left[i:] + right[j:]
+```
+
+代价是 O(n) 辅助空间，但对链表和外部排序（大文件）几乎是不二之选。
+
+## 面试常问
+
+- 为什么 Python 内置 `sorted` 这么快？—— Timsort，归并 + 插入的混合，利用现实数据中的有序片段
+- 什么场景必须稳定排序？—— 多关键字排序（先按 A 排，再按 B 排，A 的相对顺序需保持）
+
+## 小结
+
+不必手写生产排序，但必须理解每种的适用场景：小数据插入、通用快排、要稳定找归并、内存紧张用堆。

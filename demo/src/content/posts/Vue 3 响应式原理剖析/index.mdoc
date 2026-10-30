@@ -1,0 +1,62 @@
+---
+title: Vue 3 响应式原理剖析
+date: 2026-02-12
+draft: false
+category: 前端
+tags:
+  - Vue
+description: 从 Proxy 到副作用追踪，逐步拆解 Vue 3 响应式系统的实现思路，理解依赖收集与触发更新。
+---
+
+## 从 Object.defineProperty 到 Proxy
+
+Vue 2 使用 `Object.defineProperty` 劫持属性读写，无法监听属性的新增删除与数组下标变化。Vue 3 改用 `Proxy` 代理整个对象，一次性解决这些限制：
+
+```js
+const proxy = new Proxy(target, {
+  get(target, key, receiver) {
+    track(target, key); // 依赖收集
+    return Reflect.get(target, key, receiver);
+  },
+  set(target, key, value, receiver) {
+    const result = Reflect.set(target, key, value, receiver);
+    trigger(target, key); // 触发更新
+    return result;
+  },
+});
+```
+
+## 依赖收集
+
+响应式的核心问题是「谁在使用这个数据」。Vue 3 用一个全局变量保存当前正在执行的副作用函数：
+
+1. 渲染函数执行前，把自己设为 `activeEffect`
+2. 读取数据时触发 `get` 拦截，把 `activeEffect` 记录到该属性的依赖集合
+3. 数据变化时，从依赖集合中取出所有副作用并重新执行
+
+数据结构上采用 `WeakMap → Map → Set` 三层嵌套，按对象、属性、副作用逐级存放。
+
+## effect 与调度
+
+```js
+effect(() => {
+  console.log(proxy.count);
+}, {
+  scheduler(fn) {
+    queueJob(fn); // 放入微任务队列批量刷新
+  }
+});
+```
+
+渲染函数本质就是一个 effect。通过自定义 `scheduler`，Vue 把多次数据变更合并为一次 DOM 更新，这正是「异步批量更新」的由来。
+
+## ref 与 reactive 的分工
+
+- `reactive`：基于 Proxy，适合对象与数组
+- `ref`：通过 `value` 属性的 get / set 拦截实现，适合基本类型
+
+`ref` 内部若传入对象，会自动调用 `reactive` 包装。
+
+## 小结
+
+理解了「读取时收集、写入时触发」这条主线，就抓住了响应式系统的骨架。有兴趣可以在 GitHub 上阅读 `@vue/reactivity` 源码，核心实现不到一千行。

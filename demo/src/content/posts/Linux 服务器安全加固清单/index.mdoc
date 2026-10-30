@@ -1,0 +1,94 @@
+---
+title: Linux 服务器安全加固清单
+date: 2026-09-10
+draft: false
+category: 运维
+tags:
+  - Linux
+description: 从账号、SSH、防火墙到入侵检测，整理一份新服务器上线前必须过一遍的安全基线。
+---
+
+## 一台新服务器的第一小时
+
+裸奔在公网的服务器，平均几分钟就会被扫描。上线前照着这份清单过一遍，能挡掉 99% 的自动化攻击。
+
+## 账号与权限
+
+```bash
+# 1. 禁用 root 直接登录，用普通用户 + sudo
+useradd -m -G wheel deploy
+passwd deploy
+
+# 2. 删除或锁定无用账号
+usermod -L games
+```
+
+- 密码策略：`/etc/login.defs` 中设置 `PASS_MAX_DAYS 90`
+- 关键文件权限：`chmod 600 /etc/ssh/sshd_config`
+
+## SSH 加固
+
+```bash
+# /etc/ssh/sshd_config
+Port 2222                          # 改端口，过滤掉大量默认扫描
+PermitRootLogin no                 # 禁止 root 登录
+PasswordAuthentication no          # 只允许密钥
+MaxAuthTries 3
+AllowUsers deploy                  # 白名单
+```
+
+```bash
+# 本地生成并上传密钥
+ssh-keygen -t ed25519
+ssh-copy-id -p 2222 deploy@server
+```
+
+改完先别断开当前会话，新开终端验证能登录再退出——这是血泪教训。
+
+## 防火墙
+
+```bash
+# firewalld 示例
+firewall-cmd --permanent --add-port=2222/tcp
+firewall-cmd --permanent --add-service={http,https}
+firewall-cmd --reload
+```
+
+原则：**默认拒绝，按需放行**。数据库、缓存等内部服务绝不暴露公网。
+
+## 自动更新与审计
+
+```bash
+# Debian/Ubuntu 安全补丁自动安装
+apt install unattended-upgrades
+dpkg-reconfigure unattended-upgrades
+
+# 查看登录记录
+last -n 20
+lastb -n 20          # 失败的尝试
+```
+
+配合 `fail2ban` 自动封禁暴力破解 IP：
+
+```bash
+apt install fail2ban
+systemctl enable --now fail2ban
+```
+
+## 日志与告警
+
+- 集中收集 `/var/log/auth.log`、`/var/log/secure`
+- 关键文件完整性监控：AIDE
+- 云服务器开启安全组审计与操作日志
+
+## 上线自查清单
+
+1. root 登录已禁用，密钥认证生效
+2. 防火墙只开业务端口
+3. fail2ban 运行中
+4. 自动安全更新开启
+5. 有可用的备份与恢复演练
+
+## 小结
+
+安全不是一次性的动作而是基线。这份清单每新增一台服务器就执行一遍，把重复劳动固化为脚本，才是运维的正经做法。

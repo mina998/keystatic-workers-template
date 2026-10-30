@@ -1,0 +1,66 @@
+---
+title: 电脑蓝屏故障排查思路
+date: 2026-06-12
+draft: false
+category: 电脑
+tags:
+  - Windows
+  - Hardware
+description: 教你读懂蓝屏代码与转储文件，按内存、驱动、硬盘、超频四条主线定位蓝屏元凶。
+---
+
+## 蓝屏代码怎么看
+
+蓝屏界面的「停止代码」是第一线索，常见的有：
+
+- `MEMORY_MANAGEMENT`：内存问题居多
+- `IRQL_NOT_LESS_OR_EQUAL`：驱动非法访问内存
+- `KMODE_EXCEPTION_NOT_HANDLED`：内核驱动异常
+- `CRITICAL_PROCESS_DIED`：系统文件或硬盘故障
+- `WHEA_UNCORRECTABLE_ERROR`：硬件错误（CPU、电压、散热）
+
+## 拿到详细信息
+
+蓝屏重启后，用 BlueScreenView 或 WinDbg 分析 `C:\Windows\Minidump` 下的转储文件，罪魁祸首的驱动文件名往往一目了然。
+
+## 四条主线排查
+
+### 1. 内存
+
+```powershell
+mdsched.exe   # Windows 内存检测，重启后运行
+```
+
+更彻底的方式是用 MemTest86 跑完整四轮。有一条内存报错就单独逐条排查。
+
+### 2. 驱动
+
+- 重点怀疑：显卡驱动、刚装的外设驱动、虚拟化驱动
+- 显卡驱动回退到稳定版本，而非最新版
+- `verifier.exe` 驱动验证器可逼出问题驱动（排查完记得关闭）
+
+### 3. 硬盘与系统文件
+
+```powershell
+sfc /scannow
+Dism /Online /Cleanup-Image /RestoreHealth
+```
+
+再用 CrystalDiskInfo 查看硬盘健康度，出现坏道或重映射扇区应及时备份数据。
+
+### 4. 超频与硬件状态
+
+- 关闭 XMP / CPU 超频，恢复默认频率测试
+- 检查散热：硅脂老化、风扇停转导致的过热同样会蓝屏
+- 电源老化供电不稳，是老机器蓝屏的隐形元凶
+
+## 通用流程
+
+1. 记录停止代码
+2. 分析 minidump 定位驱动
+3. 回忆蓝屏前的最近变更（新硬件、新驱动、系统更新）
+4. 按内存 → 驱动 → 硬盘 → 超频的顺序逐项排除
+
+## 小结
+
+蓝屏不是玄学，是系统在用最激烈的方式告诉你哪里坏了。代码 + 转储文件双管齐下，九成蓝屏都能找到真凶。

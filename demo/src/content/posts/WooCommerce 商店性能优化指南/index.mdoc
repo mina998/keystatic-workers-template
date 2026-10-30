@@ -1,0 +1,59 @@
+---
+title: WooCommerce 商店性能优化指南
+date: 2026-06-06
+draft: false
+category: 电脑
+tags:
+  - Woocommerce
+  - Wordpress
+description: 从缓存、图片、数据库到主机层面，系统梳理提升 WooCommerce 商店加载速度的方法。
+---
+
+## 为什么慢
+
+WooCommerce 跑在 WordPress 上，动态查询多、插件杂、图片大，是速度问题的三大来源。优化思路就是围绕这三点各个击破。
+
+## 第一层：缓存
+
+- **页面缓存**：未登录用户看到的商品页可以整体缓存，首选服务器级方案（Nginx fastcgi_cache、LiteSpeed Cache）
+- **对象缓存**：Redis 或 Memcached 缓存数据库查询结果
+- **禁用购物车页缓存**：结账、账户、购物车页面必须排除
+
+```nginx
+# Nginx 排除动态页面示例
+set $skip_cache 0;
+if ($request_uri ~* "/(cart|checkout|my-account)/") {
+    set $skip_cache 1;
+}
+```
+
+## 第二层：图片
+
+商品图是流量大头：
+
+1. 上传前压缩，控制单张 200 KB 以内
+2. 输出 WebP 格式（主流优化插件都支持）
+3. 按容器尺寸生成合适的缩略图，避免 2000px 大图被缩放显示
+4. 启用懒加载
+
+## 第三层：数据库与代码
+
+- 清理过期转置数据：`wp_options` 中的 `_transient` 定期清空
+- 减少插件数量，每个插件都是潜在的查询负担
+- 排查慢查询，给 `wp_postmeta` 常用字段加索引
+- 心跳 API 与定时任务（WP-Cron）改用系统 cron
+
+## 第四层：主机与架构
+
+- PHP 8.2+ 与 OPcache 是基础
+- 数据库独立部署，避免与 Web 抢资源
+- 使用 CDN 分发静态资源与图片
+- 商品量过万时考虑对象存储承接媒体库
+
+## 度量与验证
+
+用 PageSpeed Insights 与 WebPageTest 建立基线，每次只改一项并复测，避免「改了一堆不知道哪个有效」。
+
+## 小结
+
+先缓存、再图片、后数据库，最后动架构。按这个顺序做，绝大多数商店的 LCP 都能从 5 秒压到 2 秒以内。

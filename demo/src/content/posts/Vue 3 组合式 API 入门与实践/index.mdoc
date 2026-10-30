@@ -1,0 +1,70 @@
+---
+title: Vue 3 组合式 API 入门与实践
+date: 2026-01-07
+draft: false
+category: 前端
+tags:
+  - Vue
+description: 通过一个待办事项小例子讲解 ref、computed、watch 与生命周期钩子的用法，帮助你快速上手组合式 API。
+---
+
+## 为什么需要组合式 API
+
+Options API 把逻辑按选项拆散在 data、methods、computed 中，当一个功能足够复杂时，相关代码被迫分散在各处。组合式 API 允许我们按「功能」组织代码，逻辑内聚，也更容易抽成可复用的组合函数。
+
+## 响应式基础
+
+```vue
+<script setup>
+import { ref, computed } from 'vue';
+
+const todos = ref([]);
+const newTodo = ref('');
+
+const remaining = computed(() => todos.value.filter(t => !t.done).length);
+
+function addTodo() {
+  if (!newTodo.value.trim()) return;
+  todos.value.push({ text: newTodo.value, done: false });
+  newTodo.value = '';
+}
+</script>
+```
+
+要点提醒：
+
+- `ref` 包装基本类型，脚本中通过 `.value` 访问，模板中自动解包
+- `reactive` 适合对象，但解构后会失去响应式，需配合 `toRefs`
+- `computed` 会缓存结果，依赖变化时才重新计算
+
+## 副作用与侦听
+
+```js
+watch(remaining, (val) => {
+  document.title = val === 0 ? '全部完成' : `还剩 ${val} 项`;
+});
+```
+
+`watch` 适合执行开销较大的操作或异步请求；`watchEffect` 则会立即执行并自动收集依赖。
+
+## 生命周期
+
+| Options API | 组合式 API |
+| --- | --- |
+| mounted | onMounted |
+| updated | onUpdated |
+| unmounted | onUnmounted |
+
+```js
+onMounted(async () => {
+  todos.value = await fetchTodos();
+});
+```
+
+## 抽取组合函数
+
+当逻辑变多时，可以把它抽成 `useTodos()` 这样的组合函数，内部保持完整的响应式状态与方法，组件里一行引入即可复用。
+
+## 小结
+
+组合式 API 的核心是 `ref` / `reactive` 管理状态、`computed` 派生数据、`watch` 处理副作用。先在小组件中练习拆分逻辑，再逐步沉淀自己的工具函数库。

@@ -1,0 +1,92 @@
+---
+title: TypeScript 泛型实用技巧
+date: 2026-02-24
+draft: false
+category: 前端
+tags:
+  - TypeScript
+  - JavaScript
+description: 通过分页响应、事件总线等实际案例讲解泛型约束、默认值与泛型工具类型的运用。
+---
+
+## 为什么需要泛型
+
+写一个返回数组第一项的函数时，我们不希望丢失元素类型信息：
+
+```ts
+function first<T>(list: T[]): T | undefined {
+  return list[0];
+}
+
+const n = first([1, 2, 3]); // number | undefined
+```
+
+`T` 像一个类型层面的「参数」，调用时由实参推断，复用性与类型安全兼得。
+
+## 泛型约束
+
+用 `extends` 限制类型参数的范围：
+
+```ts
+function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+  const result = {} as Pick<T, K>;
+  for (const k of keys) result[k] = obj[k];
+  return result;
+}
+
+const user = { id: 1, name: '小明', age: 18 };
+pick(user, ['name']);       // { name: string }
+```
+
+`keyof T` 把对象的键变成联合类型，是类型体操的基石。
+
+## 泛型默认值
+
+```ts
+interface ApiResponse<T = unknown> {
+  code: number;
+  data: T;
+}
+```
+
+不传类型参数时退化为 `unknown`，避免滥用 `any`。
+
+## 实战案例：分页响应
+
+```ts
+interface Page<T> {
+  list: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+async function fetchUsers(page: number): Promise<Page<User>> {
+  const res = await fetch(`/api/users?page=${page}`);
+  return res.json();
+}
+```
+
+## 实战案例：类型安全的事件总线
+
+```ts
+type Handler<T> = (payload: T) => void;
+
+class EventBus<E extends Record<string, unknown>> {
+  private map = new Map<keyof E, Set<Handler<never>>>();
+
+  on<K extends keyof E>(event: K, handler: Handler<E[K]>) {
+    const set = this.map.get(event) ?? new Set();
+    set.add(handler as Handler<never>);
+    this.map.set(event, set);
+  }
+
+  emit<K extends keyof E>(event: K, payload: E[K]) {
+    this.map.get(event)?.forEach(h => (h as Handler<E[K]>)(payload));
+  }
+}
+```
+
+## 小结
+
+泛型的价值在于「写出与具体类型无关、但类型信息完整」的代码。从工具函数入手，逐步在接口与类中应用，配合 `keyof`、`Pick`、`Omit` 等内置工具类型，能大幅提升代码质量。

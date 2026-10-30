@@ -1,0 +1,89 @@
+---
+title: Flexbox 常见布局场景实战
+date: 2026-01-31
+draft: false
+category: 前端
+tags:
+  - CSS
+description: 用 Flexbox 解决日常开发中最常见的八种布局需求，每个场景都附可直接复用的代码片段。
+---
+
+## Flexbox 的心智模型
+
+把容器想成一条「主轴」，子项沿主轴排列，再通过交叉轴控制垂直方向。设置 `flex-direction` 决定主轴方向，其余属性基本都在描述「如何分配主轴空间」和「如何在交叉轴对齐」。
+
+## 场景一：水平垂直居中
+
+```css
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+```
+
+两行代码解决历史上最著名的布局难题。
+
+## 场景二：经典顶栏（左中右）
+
+```css
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.navbar .logo { margin-right: auto; }
+.navbar .avatar { margin-left: auto; }
+```
+
+`margin: auto` 在 flex 容器中会吸收全部剩余空间，比写死宽度灵活得多。
+
+## 场景三：底部固定的粘性页脚
+
+```css
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+main { flex: 1; }
+```
+
+## 场景四：等宽多列卡片
+
+```css
+.row { display: flex; gap: 16px; }
+.row > .card { flex: 1; }
+```
+
+`flex: 1` 等价于 `flex: 1 1 0%`，所有子项平分空间且等高。
+
+## 场景五：一侧固定一侧自适应
+
+```css
+.layout { display: flex; }
+.sidebar { flex: 0 0 240px; }
+.content { flex: 1; min-width: 0; }
+```
+
+注意 `min-width: 0`，它解决了 flex 子项内容过长无法收缩的问题。
+
+## 场景六：换行标签列表
+
+```css
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+```
+
+## 常用速查
+
+| 属性 | 作用 |
+| --- | --- |
+| justify-content | 主轴对齐 |
+| align-items | 交叉轴对齐 |
+| flex-wrap | 是否换行 |
+| flex | 伸展、收缩与基准 |
+
+## 小结
+
+Flexbox 的精髓在于「空间分配」。遇到布局问题时，先确定主轴方向，再思考谁需要弹性伸缩，大部分场景都能快速落地。

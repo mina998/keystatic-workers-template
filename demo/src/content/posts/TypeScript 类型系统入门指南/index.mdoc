@@ -1,0 +1,75 @@
+---
+title: TypeScript 类型系统入门指南
+date: 2026-01-19
+draft: false
+category: 前端
+tags:
+  - TypeScript
+description: 从基础类型标注到接口与联合类型，带你在 JavaScript 项目中平滑引入 TypeScript。
+---
+
+## 为什么要用 TypeScript
+
+JavaScript 是动态类型语言，很多错误要到运行时才会暴露。TypeScript 在编译阶段就能发现类型不匹配、拼写错误、空值引用等问题，同时类型标注本身就是一份可靠的文档。
+
+## 快速上手
+
+给变量、函数参数和返回值加上类型即可：
+
+```ts
+function formatPrice(price: number, symbol = '¥'): string {
+  return `${symbol}${price.toFixed(2)}`;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email?: string; // 可选属性
+}
+
+const user: User = { id: 1, name: '小明' };
+```
+
+## 常用类型工具
+
+- **联合类型**：`let status: 'idle' | 'loading' | 'error'`
+- **数组与元组**：`number[]`、`[string, number]`
+- **字面量类型**：配合联合类型约束取值范围
+- **类型别名**：`type Point = { x: number; y: number }`
+
+## 类型收窄
+
+TypeScript 会根据控制流自动收窄类型：
+
+```ts
+function printId(id: number | string) {
+  if (typeof id === 'string') {
+    console.log(id.toUpperCase()); // 此时是 string
+  } else {
+    console.log(id.toFixed(0));    // 此时是 number
+  }
+}
+```
+
+## 泛型初探
+
+```ts
+function first<T>(list: T[]): T | undefined {
+  return list[0];
+}
+
+const n = first([1, 2, 3]);      // number | undefined
+const s = first(['a', 'b']);     // string | undefined
+```
+
+泛型让函数在保留类型信息的同时可以适配多种数据结构。
+
+## 迁移建议
+
+1. 先把 `allowJs` 打开，允许 JS 与 TS 共存
+2. 从工具函数和公共模块开始补充类型
+3. 逐步收紧 `strict` 相关选项，如 `noImplicitAny`
+
+## 小结
+
+类型系统不是负担而是安全网。从简单的接口定义开始，配合编辑器的智能提示，很快就能体会到「改一处、错处处报」的畅快。

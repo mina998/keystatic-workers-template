@@ -1,0 +1,78 @@
+---
+title: 用 Git Hooks 打造自动化工作流
+date: 2026-07-30
+draft: false
+category: 编程
+tags:
+  - Git
+description: 介绍 pre-commit、commit-msg 等常用钩子的用法，配合 husky 与 lint-staged 实现代码质量门禁。
+---
+
+## Hooks 是什么
+
+Git 在提交、推送等关键动作前后会触发仓库 `.git/hooks/` 目录下的脚本，脚本返回非零即可中断操作。这是把规范变成「机器强制」的最廉价手段。
+
+## 常用钩子一览
+
+| 钩子 | 触发时机 | 典型用途 |
+| --- | --- | --- |
+| pre-commit | commit 前 | lint、格式化、阻止敏感信息 |
+| commit-msg | 写入提交信息时 | 校验 commit message 规范 |
+| pre-push | push 前 | 跑测试 |
+| post-checkout | 切换分支后 | 自动 npm install |
+
+## 原生写法
+
+```bash
+#!/bin/sh
+# .git/hooks/pre-commit
+if git diff --cached | grep -i "password"; then
+  echo "检测到疑似密码，禁止提交"
+  exit 1
+fi
+```
+
+给文件加执行权限即可生效。但 `.git` 目录不进版本库，团队共享才是重点。
+
+## 工程化方案：husky + lint-staged
+
+```bash
+npm install --save-dev husky lint-staged
+npx husky init
+```
+
+```json
+// package.json
+{
+  "lint-staged": {
+    "*.{js,ts}": ["eslint --fix", "prettier --write"],
+    "*.css": ["stylelint --fix"]
+  }
+}
+```
+
+```bash
+# .husky/pre-commit
+npx lint-staged
+```
+
+`lint-staged` 只处理暂存区文件，避免全仓库检查的漫长等待。
+
+## commit-msg 规范校验
+
+```bash
+# .husky/commit-msg
+npx --no-install commitlint --edit "$1"
+```
+
+配合 commitlint 的 conventional 配置，`git commit -m "修了个bug"` 这类消息将无法通过。
+
+## 该放什么、不该放什么
+
+**适合**：lint、格式化、提交信息校验、生成文档索引——秒级完成的检查。
+
+**不适合**：完整测试套件、构建验证——耗时操作交给 CI（pre-push 可作为折中）。
+
+## 小结
+
+Hooks 的价值在于「让错误停在本地，而不是 CI 红灯」。花半小时配置，换整个团队干净的提交历史，性价比极高。

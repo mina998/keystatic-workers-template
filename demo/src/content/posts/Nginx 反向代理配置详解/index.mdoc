@@ -1,0 +1,80 @@
+---
+title: Nginx 反向代理配置详解
+date: 2026-09-04
+draft: false
+category: 运维
+tags:
+  - Nginx
+  - Linux
+description: 讲解 proxy_pass 与 upstream 的用法，覆盖负载均衡、WebSocket、真实 IP 透传等实战要点。
+---
+
+## 正向与反向
+
+正向代理替客户端访问外部（翻墙工具），反向代理替服务端接收请求（负载均衡、SSL 终结、缓存）。生产架构里，Nginx 几乎总站在应用前面。
+
+## 基础配置
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+三个 header 让后端拿到真实客户端信息，不加的话应用日志里全是 Nginx 的 IP。
+
+## 负载均衡
+
+```nginx
+upstream backend {
+    least_conn;                       # 最少连接策略
+    server 10.0.0.1:3000 weight=3;
+    server 10.0.0.2:3000;
+    server 10.0.0.3:3000 backup;      # 备用节点
+    keepalive 32;
+}
+```
+
+默认轮询，`weight` 加权，`ip_hash` 会话保持，`least_conn` 按负载分发。
+
+## WebSocket 支持
+
+```nginx
+location /ws {
+    proxy_pass http://backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;          # 防止长连接被掐断
+}
+```
+
+## 超时与缓冲
+
+```nginx
+proxy_connect_timeout 5s;
+proxy_send_timeout    30s;
+proxy_read_timeout    60s;
+client_max_body_size  20m;             # 上传大文件必调
+```
+
+## 常用排查命令
+
+```bash
+nginx -t                  # 改完配置先测试
+nginx -s reload           # 平滑重载
+tail -f /var/log/nginx/error.log
+```
+
+## 小结
+
+反向代理的配置套路高度模板化：`proxy_pass` 指路、headers 透传信息、`upstream` 管后端集群、超时参数兜底。把这段模板存进笔记，新项目直接改地址就能用。

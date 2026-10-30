@@ -1,0 +1,79 @@
+---
+title: Python 异步编程 asyncio 实战
+date: 2026-07-24
+draft: false
+category: 编程
+tags:
+  - Python
+description: 讲清事件循环、协程与 await 的关系，用 aiohttp 实现并发爬虫，避开常见坑点。
+---
+
+## 同步与异步的差异
+
+同步代码发起网络请求时，整个线程都在干等；异步代码在等待 I/O 时挂起当前任务，让事件循环去跑别的任务。**asyncio 提速的本质是并发 I/O，而不是并行计算**。
+
+## 最小可运行示例
+
+```python
+import asyncio
+
+async def fetch(name, delay):
+    await asyncio.sleep(delay)      # 模拟 I/O，让出控制权
+    return f"{name} 完成"
+
+async def main():
+    results = await asyncio.gather(
+        fetch("任务A", 2),
+        fetch("任务B", 1),
+        fetch("任务C", 3),
+    )
+    print(results)  # 总耗时约 3 秒而非 6 秒
+
+asyncio.run(main())
+```
+
+三个要点：
+
+- `async def` 定义协程函数，调用它得到协程对象，不会执行
+- `await` 只能在 `async` 函数内使用，表示「等它完成，期间让出」
+- `asyncio.run()` 是程序的入口，不要在事件循环已运行时再调用
+
+## 实战：并发请求
+
+```python
+import aiohttp
+
+async def fetch_title(session, url):
+    async with session.get(url) as resp:
+        text = await resp.text()
+        return url, text.split("<title>")[1].split("</title>")[0]
+
+async def main(urls):
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_title(session, u) for u in urls]
+        return await asyncio.gather(*tasks)
+```
+
+注意 `aiohttp` 的 `ClientSession` 是异步上下文管理器，复用连接池是性能关键。
+
+## 常见坑
+
+1. **忘了 await**：拿到的是协程对象，函数根本没执行，还会有「never awaited」警告
+2. **在协程里调用阻塞函数**：`time.sleep(3)` 会卡住整个事件循环。改用 `await asyncio.sleep(3)`，真阻塞调用放 `loop.run_in_executor`
+3. **无限并发打爆对端**：用信号量限流
+
+```python
+sem = asyncio.Semaphore(10)
+
+async def limited(url):
+    async with sem:
+        return await fetch_title(session, url)
+```
+
+## 什么时候不该用
+
+CPU 密集型任务（图像处理、数值计算）应使用多进程；asyncio 只对 I/O 密集场景有效。
+
+## 小结
+
+记住公式：**async 定义、await 等待、gather 并发、信号量限流**。网络爬虫、批量 API 调用这类场景，几行改动就能获得数量级的提速。

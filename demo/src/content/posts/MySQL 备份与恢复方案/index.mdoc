@@ -1,0 +1,89 @@
+---
+title: MySQL 备份与恢复方案
+date: 2026-10-16
+draft: false
+category: 运维
+tags:
+  - MySQL
+description: 对比逻辑备份与物理备份的适用场景，给出 mysqldump、xtrabackup 的实操命令与备份体系设计。
+---
+
+## 先想清楚三件事
+
+1. **RPO（能接受丢多少数据）**：决定全量 + 增量 / binlog 的频率
+2. **RTO（多久要恢复）**：决定用逻辑备份还是物理备份
+3. **备份放哪**：本机备份约等于没有备份，必须异地
+
+## 逻辑备份：mysqldump
+
+```bash
+# 全库备份（含建库语句与触发器）
+mysqldump -u root -p \
+  --single-transaction \
+  --routines --triggers --events \
+  --all-databases > full_$(date +%F).sql
+
+# 只备份单个库
+mysqldump -u root -p --single-transaction mydb > mydb.sql
+```
+
+`--single-transaction` 对 InnoDB 做一致性快照，不锁表。
+
+**恢复：**
+
+```bash
+mysql -u root -p mydb < mydb.sql
+```
+
+优点：文本可读、跨版本兼容。缺点：大数据量恢复慢（GB 级别要小时计）。
+
+## 物理备份：xtrabackup
+
+```bash
+# 全量备份（不锁库）
+xtrabackup --backup -u root -p密码 \
+  --target-dir=/backup/full_$(date +%F)
+
+# 准备阶段（让备份可用）
+xtrabackup --prepare --target-dir=/backup/full_xxx
+
+# 恢复：拷回数据目录
+xtrabackup --copy-back --target-dir=/backup/full_xxx
+chown -R mysql:mysql /var/lib/mysql
+```
+
+优点：速度快，百 GB 级别的首选。缺点：绑定版本与平台。
+
+## 增量与 binlog
+
+```bash
+# xtrabackup 增量
+xtrabackup --backup --target-dir=/backup/inc1 \
+  --incremental-basedir=/backup/full_xxx
+```
+
+配合 binlog 可恢复到**任意时间点**：
+
+```bash
+mysqlbinlog --start-datetime="2026-10-16 10:00:00" \
+            --stop-datetime="2026-10-16 10:30:00" \
+  binlog.000123 | mysql -u root -p
+```
+
+误删表后的标准姿势：恢复昨晚全量 + 重放 binlog 到删表前一秒。
+
+## 备份体系设计
+
+```
+每日全量（凌晨低峰）→ 异地传输（对象存储）→ 保留 7 天
+binlog 实时开启     → 保留 3 天
+每月 1 号的备份     → 保留 1 年
+```
+
+## 最重要的一步
+
+**定期演练恢复。** 没有验证过的备份只是心理安慰。建议每季度在测试机完整恢复一次，记录耗时并核对数据。
+
+## 小结
+
+小库用 mysqldump + cron + 异地存储即可；大了上 xtrabackup；要时间点恢复就开 binlog。而无论哪种方案，演练才是备份的最后一环。
